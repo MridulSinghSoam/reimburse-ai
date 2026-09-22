@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReimburseAI · Bill scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">ReimburseAI</div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="submit" role="tab" aria-selected="true">Submit a bill</button>
+      <button class="tab" data-view="benefits" role="tab" aria-selected="false">My benefits</button>
+      <button class="tab" data-view="review" role="tab" aria-selected="false">HR review</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- EMPLOYEE VIEW -->
+    <section id="view-submit" class="view">
+      <div class="intro">
+        <h1>Snap your bill. We'll read it for you.</h1>
+        <p>Upload a fuel, phone, food or travel bill. The amount, date and category are filled in automatically, and HR gets it for approval.</p>
+      </div>
+
+      <div class="submit-grid">
+        <form id="upload-form" class="panel">
+          <label for="employee">Your name</label>
+          <input id="employee" name="employee_name" required placeholder="e.g. Mridul Sharma" autocomplete="name">
+
+          <label for="file">Bill</label>
+          <label class="dropzone" id="dropzone" for="file">
+            <input id="file" name="file" type="file" accept="image/jpeg,image/png,application/pdf" required>
+            <span id="drop-text">Drop a JPG, PNG or PDF here, or click to choose</span>
+          </label>
+
+          <button type="submit" class="primary" id="scan-btn">Scan bill</button>
+          <p class="error" id="upload-error" role="alert"></p>
+        </form>
+
+        <div id="result" class="result-slot">
+          <p class="empty">Your scanned bill will appear here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- EMPLOYEE: MY BENEFITS + REBALANCE -->
+    <section id="view-benefits" class="view" hidden>
+      <div class="intro">
+        <h1>Use your benefits where you need them.</h1>
+        <p>Had an unplanned expense? Move unused money from one category to another. Your total monthly budget stays the same, and HR approves the change.</p>
+      </div>
+
+      <form id="lookup-form" class="lookup">
+        <label for="benefit-employee">Your name</label>
+        <div class="lookup-row">
+          <input id="benefit-employee" required placeholder="e.g. Mridul Sharma" autocomplete="name">
+          <button type="submit" class="primary">Show my benefits</button>
+        </div>
+      </form>
+
+      <div id="benefits-area" hidden>
+        <div class="panel">
+          <div class="table-head">
+            <h2 id="balance-title">This month</h2>
+            <span class="muted" id="total-budget"></span>
+          </div>
+          <div id="balance-list" class="balance-list"></div>
+        </div>
+
+        <div class="benefit-grid">
+          <form id="move-form" class="panel">
+            <h2>Move unused money</h2>
+            <div class="move-row">
+              <div>
+                <label for="from-cat">From</label>
+                <select id="from-cat" required></select>
+              </div>
+              <div>
+                <label for="to-cat">To</label>
+                <select id="to-cat" required></select>
+              </div>
+            </div>
+            <label for="move-amount">Amount (Rs)</label>
+            <input id="move-amount" type="number" min="100" step="50" required>
+            <p class="hint" id="move-hint"></p>
+            <label for="move-reason">Why do you need this?</label>
+            <input id="move-reason" required minlength="3" maxlength="300" placeholder="e.g. Extra internet bill for work-from-home this month">
+            <button type="submit" class="primary" id="move-btn">Send request to HR</button>
+            <p class="error" id="move-error" role="alert"></p>
+          </form>
+
+          <div class="panel">
+            <h2>My requests</h2>
+            <ul id="my-moves" class="move-list"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HR VIEW -->
+    <section id="view-review" class="view" hidden>
+      <div class="stats" id="stats"></div>
+
+      <div class="panel">
+        <div class="table-head">
+          <h2>Claims</h2>
+          <select id="status-filter" aria-label="Filter by status">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Employee</th><th>Vendor</th><th>Category</th><th class="num">Amount</th><th>Checks</th><th>Status</th></tr>
+            </thead>
+            <tbody id="claims-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel hr-moves">
+        <div class="table-head">
+          <h2>Limit change requests</h2>
+        </div>
+        <ul id="hr-moves" class="move-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="claim-dialog">
+    <div class="dialog-inner">
+      <div class="bill-preview" id="bill-preview"></div>
+      <div class="dialog-side">
+        <div id="dialog-receipt"></div>
+        <form id="decision-form" method="dialog">
+          <label for="hr-comment">Comment for the employee</label>
+          <textarea id="hr-comment" rows="3" placeholder="Required when rejecting"></textarea>
+          <p class="error" id="decision-error" role="alert"></p>
+          <div class="actions">
+            <button type="button" class="ghost" id="close-dialog">Close</button>
+            <button type="button" class="danger" id="reject-btn">Reject</button>
+            <button type="button" class="primary" id="approve-btn">Approve</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+# CI/CD pipeline
+#  - On every pull request: install + run tests (CI)
+#  - On every push to main: run tests, then deploy to Azure App Service (CD),
+#    then call /health to make sure the live site actually works.
+
+name: CI/CD - Test and deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+
+env:
+  AZURE_WEBAPP_NAME: reimburseai-app     # <-- change to your App Service name
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -v
+
+  deploy:
+    name: Deploy to Azure
+    needs: test                              # only deploy if tests pass
+    if: github.event_name != 'pull_request'  # never deploy from a PR
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package the app
+        run: zip -r release.zip app requirements.txt -x "*__pycache__*"
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: release.zip
+
+      - name: Smoke test the live site
+        run: |
+          URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health"
+          for i in $(seq 1 20); do
+            if curl -fsS "$URL"; then echo; echo "Live site is healthy"; exit 0; fi
+            echo "Waiting for app to start ($i/20)..."; sleep 15
+          done
+          echo "Health check failed"; exit 1
